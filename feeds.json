@@ -3,7 +3,7 @@
     "id": "concursos-es-qconcursos",
     "title": "Concursos Espírito Santo (ES) - Folha QConcursos",
     "url": "https://folha.qconcursos.com/e/concursos-espirito-santo-es",
-    "description": "Últimas notícias, editais abertos e previstos de concursos públicos no Espírito Santo (ES) via Folha Dirigida / QConcursos.",
+    "description": "Últimas notícias, editais abertos e previstos de concursos públicos no Espírito Santo (ES).",
     "render_js": false,
     "auto_detect": false,
     "selectors": {
@@ -12,6 +12,121 @@
       "link": "",
       "description": "p",
       "image": "img"
+    },
+    "max_items": 25
+  },
+  {
+    "id": "concursos-nacionais-qconcursos",
+    "title": "Concursos Nacionais - Folha QConcursos",
+    "url": "https://folha.qconcursos.com/",
+    "description": "Notícias nacionais de concursos públicos, editais abertos e previstos em todo o Brasil.",
+    "render_js": false,
+    "auto_detect": false,
+    "selectors": {
+      "item": "a[href^=\"/n/\"]",
+      "title": "h2, h3",
+      "link": "",
+      "description": "p",
+      "image": "img"
+    },
+    "max_items": 25
+  },
+  {
+    "id": "g1-es",
+    "title": "G1 Espírito Santo (ES)",
+    "url": "https://g1.globo.com/es/espirito-santo/",
+    "description": "Últimas notícias do Espírito Santo no portal G1 ES.",
+    "render_js": false,
+    "auto_detect": false,
+    "selectors": {
+      "item": ".feed-post-body",
+      "title": "a.feed-post-link",
+      "link": "a.feed-post-link[href]",
+      "description": ".feed-post-body-resumo",
+      "image": "img.bstn-fd-picture-image"
+    },
+    "max_items": 25
+  },
+  {
+    "id": "tconline-sao-mateus",
+    "title": "Tribuna do Cricaré (TC Online - São Mateus ES)",
+    "url": "https://tconline.com.br/",
+    "rss_url": "https://tconline.com.br/feed/",
+    "description": "Notícias locais de São Mateus e norte do Espírito Santo via Tribuna do Cricaré.",
+    "render_js": false,
+    "auto_detect": false,
+    "selectors": {
+      "item": "h3.td-module-title",
+      "title": "a",
+      "link": "a",
+      "description": "",
+      "image": ""
+    },
+    "max_items": 25
+  },
+  {
+    "id": "tribuna-online-es",
+    "title": "Jornal A Tribuna ES (Tribuna Online)",
+    "url": "https://tribunaonline.com.br/?home=espirito_santo",
+    "description": "Notícias do Espírito Santo pelo Jornal A Tribuna (Tribuna Online).",
+    "render_js": false,
+    "auto_detect": false,
+    "selectors": {
+      "item": "a.mw-link-decoration[href^=\"/\"]",
+      "title": "h2, div > h3",
+      "link": "",
+      "link_regex": "-\\d{5,}$",
+      "description": "h3.description",
+      "image": "img"
+    },
+    "max_items": 25
+  },
+  {
+    "id": "folha-vitoria",
+    "title": "Folha Vitória - Jornal Online do ES",
+    "url": "https://www.folhavitoria.com.br/",
+    "rss_url": "https://www.folhavitoria.com.br/feed/",
+    "description": "Últimas notícias do Espírito Santo no jornal online Folha Vitória.",
+    "render_js": true,
+    "auto_detect": false,
+    "selectors": {
+      "item": "a:has(h2.feed-title)",
+      "title": "h2.feed-title",
+      "link": "",
+      "description": "p",
+      "image": "img"
+    },
+    "max_items": 25
+  },
+  {
+    "id": "sim-noticias-es",
+    "title": "SIM Notícias ES",
+    "url": "https://simnoticias.com.br/",
+    "description": "Jornalismo local e notícias do Espírito Santo via SIM Notícias.",
+    "render_js": false,
+    "auto_detect": false,
+    "selectors": {
+      "item": "div.jet-listing-grid__item",
+      "title": "div.elementor-widget-text-editor:last-of-type",
+      "link": "a.jet-engine-listing-overlay-link",
+      "description": "",
+      "image": "img"
+    },
+    "max_items": 25
+  },
+  {
+    "id": "ge-palmeiras",
+    "title": "GE Globo Esporte - Palmeiras",
+    "url": "https://ge.globo.com/futebol/times/palmeiras/",
+    "description": "Últimas notícias, escalações e jogos do Palmeiras no GE.",
+    "render_js": false,
+    "auto_detect": false,
+    "selectors": {
+      "item": ".feed-post-body",
+      "title": "a.feed-post-link[href]",
+      "link": "a.feed-post-link[href]",
+      "description": ".feed-post-body-resumo",
+      "image": "img.bstn-fd-picture-image"
     },
     "max_items": 25
   }

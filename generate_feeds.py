@@ -19,10 +19,11 @@ FEEDS_DIR = os.path.join(OUTPUT_DIR, "feeds")
 
 
 def fetch_html(url: str, render_js: bool = False, wait_for: str = "") -> str:
-    """Busca o HTML de uma página via requests (rápido) ou Playwright (para SPAs/React)."""
+    """Busca o HTML/XML de uma página via requests (rápido) ou Playwright (para SPAs/React/Cloudflare)."""
     if not render_js:
         resp = requests.get(url, headers=HEADERS, timeout=25)
         resp.raise_for_status()
+        resp.encoding = resp.apparent_encoding or "utf-8"
         return resp.text
 
     # Renderização com JavaScript usando Playwright
@@ -32,17 +33,62 @@ def fetch_html(url: str, render_js: bool = False, wait_for: str = "") -> str:
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(user_agent=HEADERS["User-Agent"])
         page = context.new_page()
-        page.goto(url, wait_until="networkidle", timeout=45000)
+        page.goto(url, wait_until="domcontentloaded", timeout=45000)
         if wait_for:
             try:
-                page.wait_for_selector(wait_for, timeout=10000)
+                page.wait_for_selector(wait_for, timeout=12000)
             except Exception as e:
                 print(f"  [Aviso] Timeout aguardando seletor '{wait_for}': {e}")
         else:
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(3000)
         html = page.content()
         browser.close()
         return html
+
+
+def extract_from_native_rss(xml_text: str, max_items: int = 25, exclude_url_pattern: str = "") -> list[dict]:
+    """Extrai itens quando a fonte possui um endpoint RSS/XML nativo (ex: WordPress /feed/)."""
+    soup = BeautifulSoup(xml_text, "xml")
+    items = []
+    seen_links = set()
+
+    for item_el in soup.find_all("item"):
+        title_el = item_el.find("title")
+        link_el = item_el.find("link")
+        desc_el = item_el.find("description")
+
+        title = title_el.get_text(strip=True) if title_el else ""
+        link = link_el.get_text(strip=True) if link_el else ""
+        if not title or not link or link in seen_links:
+            continue
+
+        if exclude_url_pattern and re.search(exclude_url_pattern, link):
+            continue
+
+        desc_raw = desc_el.get_text(strip=True) if desc_el else ""
+        desc_soup = BeautifulSoup(desc_raw, "lxml")
+        desc_clean = desc_soup.get_text(" ", strip=True)[:350]
+
+        img_url = ""
+        media_el = item_el.find("content") or item_el.find("thumbnail") or item_el.find("enclosure")
+        if media_el and media_el.get("url"):
+            img_url = media_el.get("url")
+        else:
+            img_in_desc = desc_soup.find("img")
+            if img_in_desc and img_in_desc.get("src"):
+                img_url = img_in_desc.get("src")
+
+        seen_links.add(link)
+        items.append({
+            "title": title,
+            "link": link,
+            "description": desc_clean,
+            "image": img_url,
+        })
+        if len(items) >= max_items:
+            break
+
+    return items
 
 
 def extract_auto(soup: BeautifulSoup, base_url: str, max_items: int = 20) -> list[dict]:
@@ -51,7 +97,6 @@ def extract_auto(soup: BeautifulSoup, base_url: str, max_items: int = 20) -> lis
     seen_links = set()
     base_domain = urlparse(base_url).netloc
 
-    # 1. Tenta procurar tags <article> ou containers comuns de post
     candidates = soup.select("article, .post, .card, .news-item, .entry, [class*='post-'], [class*='article-']")
 
     if candidates:
@@ -66,17 +111,14 @@ def extract_auto(soup: BeautifulSoup, base_url: str, max_items: int = 20) -> lis
             if full_url in seen_links:
                 continue
 
-            # Título
             heading = el.select_one("h1, h2, h3, h4")
             title = heading.get_text(" ", strip=True) if heading else a_tag.get_text(" ", strip=True)
             if not title or len(title) < 8:
                 continue
 
-            # Descrição
             p_tag = el.select_one("p, .summary, .excerpt, .description")
             desc = p_tag.get_text(" ", strip=True) if p_tag else ""
 
-            # Imagem
             img_tag = el.select_one("img")
             img_url = ""
             if img_tag:
@@ -94,7 +136,6 @@ def extract_auto(soup: BeautifulSoup, base_url: str, max_items: int = 20) -> lis
             if len(items) >= max_items:
                 return items
 
-    # 2. Fallback: Procura links dentro de títulos (h1, h2, h3)
     for a_tag in soup.select("h1 a[href], h2 a[href], h3 a[href], a[href] h2, a[href] h3"):
         if a_tag.name != "a":
             a_tag = a_tag.find_parent("a")
@@ -112,7 +153,6 @@ def extract_auto(soup: BeautifulSoup, base_url: str, max_items: int = 20) -> lis
         if not title or len(title) < 10:
             continue
 
-        # Evita links de menu genéricos
         if urlparse(full_url).netloc == base_domain and full_url.rstrip("/") == base_url.rstrip("/"):
             continue
 
@@ -142,21 +182,24 @@ def extract_with_selectors(soup: BeautifulSoup, base_url: str, selectors: dict, 
     link_sel = selectors.get("link", "").strip()
     desc_sel = selectors.get("description", "").strip()
     img_sel = selectors.get("image", "").strip()
+    link_regex = selectors.get("link_regex", "").strip()
 
     for el in soup.select(item_sel):
         # Título
+        title = ""
         if title_sel:
             t_el = el.select_one(title_sel)
-            title = t_el.get_text(" ", strip=True) if t_el else ""
-        else:
-            title = el.get_text(" ", strip=True)
+            if t_el:
+                title = t_el.get_text(" ", strip=True)
+        if not title:
+            title = el.get("title") or el.get_text(" ", strip=True)
 
         # Link
         link = ""
         if link_sel:
             l_el = el.select_one(link_sel)
             if l_el:
-                link = l_el.get("href", "")
+                link = l_el.get("href") or l_el.get("data-url") or ""
         elif el.name == "a":
             link = el.get("href", "")
         else:
@@ -164,11 +207,14 @@ def extract_with_selectors(soup: BeautifulSoup, base_url: str, selectors: dict, 
             if a_el:
                 link = a_el.get("href", "")
 
-        if not title or not link:
+        if not title or not link or len(title) < 8:
             continue
 
         full_url = urljoin(base_url, link.strip())
         if full_url in seen_links:
+            continue
+
+        if link_regex and not re.search(link_regex, full_url):
             continue
 
         # Descrição
@@ -177,6 +223,8 @@ def extract_with_selectors(soup: BeautifulSoup, base_url: str, selectors: dict, 
             d_el = el.select_one(desc_sel)
             if d_el:
                 desc = d_el.get_text(" ", strip=True)
+                if desc == title:
+                    desc = ""
 
         # Imagem
         img_url = ""
@@ -210,7 +258,6 @@ def build_rss_xml(feed_cfg: dict, items: list[dict], output_path: str):
     fg.language("pt-BR")
     fg.lastBuildDate(datetime.now(timezone.utc))
 
-    # Invertemos na inserção ou mantemos a ordem de relevância
     for item in reversed(items):
         fe = fg.add_entry()
         fe.id(item["link"])
@@ -236,13 +283,13 @@ def build_dashboard_html(metadata_list: list[dict], updated_at: str):
     for meta in metadata_list:
         status_badge = (
             f'<span class="badge success">Ativo ({meta["count"]} itens)</span>'
-            if meta["status"] == "ok"
-            else f'<span class="badge error">Erro: {meta.get("error", "Falha")}</span>'
+            if meta["status"] == "ok" and meta["count"] > 0
+            else f'<span class="badge error">Erro: {meta.get("error", "0 itens")}</span>'
         )
         mode_badge = (
             '<span class="badge js">JS / Dinâmico</span>'
             if meta.get("render_js")
-            else '<span class="badge static">HTML Rápido</span>'
+            else '<span class="badge static">HTML / RSS</span>'
         )
 
         preview_items = ""
@@ -492,7 +539,6 @@ def build_dashboard_html(metadata_list: list[dict], updated_at: str):
     </div>
 
     <script>
-        // Converte caminhos relativos para URL completa do GitHub Pages automaticamente
         window.addEventListener('DOMContentLoaded', () => {{
             const base = window.location.origin + window.location.pathname.replace(/index\\.html$/, '').replace(/\\/?$/, '/');
             document.querySelectorAll('.rss-input').forEach(inp => {{
@@ -562,19 +608,35 @@ def main():
     for cfg in feeds_config:
         feed_id = cfg["id"]
         url = cfg["url"]
+        rss_url = cfg.get("rss_url", "")
         render_js = cfg.get("render_js", False)
         auto_detect = cfg.get("auto_detect", True)
-        max_items = cfg.get("max_items", 20)
+        max_items = cfg.get("max_items", 25)
 
         print(f"-> Processando [{feed_id}] ({url}) | JS={render_js} | Auto={auto_detect}")
         try:
-            html = fetch_html(url, render_js=render_js, wait_for=cfg.get("wait_for", ""))
-            soup = BeautifulSoup(html, "lxml")
+            items = []
+            # Se tiver um feed RSS nativo configurado (ex: WordPress /feed/), tenta primeiro
+            if rss_url:
+                try:
+                    xml_raw = fetch_html(rss_url, render_js=False)
+                    items = extract_from_native_rss(
+                        xml_raw,
+                        max_items=max_items,
+                        exclude_url_pattern=cfg.get("exclude_url_pattern", ""),
+                    )
+                except Exception as rss_err:
+                    print(f"   [Aviso] Falha ao ler rss_url ({rss_url}), tentando HTML: {rss_err}")
 
-            if auto_detect or not cfg.get("selectors"):
-                items = extract_auto(soup, url, max_items=max_items)
-            else:
-                items = extract_with_selectors(soup, url, cfg["selectors"], max_items=max_items)
+            # Se não usou rss_url ou retornou vazio, faz o scraping HTML/Playwright
+            if not items:
+                html = fetch_html(url, render_js=render_js, wait_for=cfg.get("wait_for", ""))
+                soup = BeautifulSoup(html, "lxml")
+
+                if auto_detect or not cfg.get("selectors"):
+                    items = extract_auto(soup, url, max_items=max_items)
+                else:
+                    items = extract_with_selectors(soup, url, cfg["selectors"], max_items=max_items)
 
             xml_filename = f"{feed_id}.xml"
             xml_path = os.path.join(FEEDS_DIR, xml_filename)
@@ -588,7 +650,8 @@ def main():
                 "source_url": url,
                 "render_js": render_js,
                 "xml_rel_path": f"feeds/{xml_filename}",
-                "status": "ok",
+                "status": "ok" if items else "error",
+                "error": "" if items else "Nenhum item encontrado",
                 "count": len(items),
                 "preview": items[:5],
             })
