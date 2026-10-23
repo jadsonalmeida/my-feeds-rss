@@ -129,5 +129,21 @@
       "image": "img.bstn-fd-picture-image"
     },
     "max_items": 25
+  },
+  {
+    "id": "ge-geral",
+    "title": "GE Globo Esporte - Notícias Gerais",
+    "url": "https://ge.globo.com/",
+    "description": "Principais notícias de futebol e esportes da capa do GE Globo Esporte.",
+    "render_js": false,
+    "auto_detect": false,
+    "selectors": {
+      "item": ".feed-post-body",
+      "title": "a.feed-post-link[href]",
+      "link": "a.feed-post-link[href]",
+      "description": ".feed-post-body-resumo",
+      "image": "img.bstn-fd-picture-image"
+    },
+    "max_items": 25
   }
 ]
