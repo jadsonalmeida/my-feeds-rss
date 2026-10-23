@@ -1,0 +1,57 @@
+name: Atualizar Feeds RSS e Publicar no GitHub Pages
+
+on:
+  schedule:
+    # Roda automaticamente a cada 1 hora (você pode mudar para */30 * * * * para cada 30 min)
+    - cron: '0 * * * *'
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Permite rodar manualmente clicando em um botão no GitHub
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependências Python
+        run: pip install -r requirements.txt
+
+      - name: Instalar navegador Chromium (Playwright) para sites em JS
+        run: playwright install --with-deps chromium
+
+      - name: Gerar Feeds RSS e Painel Web
+        run: python generate_feeds.py
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Enviar arquivos gerados (pasta public)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './public'
+
+      - name: Publicar no GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

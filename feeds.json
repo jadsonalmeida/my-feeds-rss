@@ -1,0 +1,18 @@
+[
+  {
+    "id": "concursos-es-qconcursos",
+    "title": "Concursos Espírito Santo (ES) - Folha QConcursos",
+    "url": "https://folha.qconcursos.com/e/concursos-espirito-santo-es",
+    "description": "Últimas notícias, editais abertos e previstos de concursos públicos no Espírito Santo (ES) via Folha Dirigida / QConcursos.",
+    "render_js": false,
+    "auto_detect": false,
+    "selectors": {
+      "item": "a[href^=\"/n/\"]",
+      "title": "h2, h3",
+      "link": "",
+      "description": "p",
+      "image": "img"
+    },
+    "max_items": 25
+  }
+]
